@@ -23,7 +23,7 @@ The execute the tests with:
 
 **VADD: add items into a vector set**
 
-    VADD key [REDUCE dim] FP32|VALUES vector element [CAS] [NOQUANT] [BIN]
+    VADD key [REDUCE dim] FP32|VALUES vector element [CAS] [NOQUANT] [BIN] [Q8]
              [EF build-exploration-factor]
 
 Add a new element into the vector set specified by the key.
@@ -43,6 +43,8 @@ performed in the background, while the command is executed in the main thread.
 The `NOQUANT` option forces the vector to be created (in the first VADD call to a given key) without integer 8 quantization, which is otherwise the default.
 
 The `BIN` option forces the vector to use binary quantization instead of int8. This is much faster and uses less memory, but has impacts on the recall quality.
+
+The `Q8` option forces the vector to use signed 8 bit quantization. This is the default, and the option only exists in order to make sure to check at insertion time if the vector set is of the same format.
 
 The `EF` option plays a role in the effort made to find good candidates when connecting the new node to the existing HNSW graph. The default is 200. Using a larger value, may help to have a better recall. To improve the recall it is also possible to increase `EF` during `VSIM` searches.
 
