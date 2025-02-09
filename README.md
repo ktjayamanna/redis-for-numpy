@@ -1,9 +1,13 @@
-This module implements vector sets for Redis, a new Redis data type similar
-to sorted sets but having a vector instead of a score. It is possible to
-add items and then get them back by similiarity to either a user-provided
-vector or a vector of an element already inserted.
+This module implements Vector Sets for Redis, a new Redis data type similar
+to Sorted Sets but having string elements associated to a vector instead of
+a score. The fundamental goal of Vector Sets is to make possible adding items,
+and later get a subset of the added items that are the most similar to a
+specified vector (often a learned embedding) of the most similar to the vector
+of an element that is already part of the Vector Set.
 
 ## Installation
+
+Buil with:
 
     make
 
@@ -19,7 +23,7 @@ The execute the tests with:
 
     ./test.py
 
-## Commands
+## Reference of available commands
 
 **VADD: add items into a vector set**
 
