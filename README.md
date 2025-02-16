@@ -138,6 +138,19 @@ Because vector sets perform insertion time normalization and optional
 quantization, the returned vector could be approximated. `VEMB` will take
 care to de-quantized and de-normalize the vector before returning it.
 
+It is possible to ask VEMB to return raw data, that is, the interal representation used by the vector: fp32, int8, or a bitmap for binary quantization. This behavior is triggered by the `RAW` option of of VEMB:
+
+    VEMB word_embedding apple RAW
+
+In this case the return value of the command is an array of three or more elements:
+1. The name of the quantization used, that is one of: "fp32", "bin", "q8".
+2. The a string blob containing the raw data, 4 bytes fp32 floats for fp32, a bitmap for binary quants, or int8 bytes array for q8 quants.
+3. A float representing the l2 of the vector before normalization. You need to multiply by this vector if you want to de-normalize the value for any reason.
+
+For q8 quantization, an additional elements is also returned: the quantization
+range, so the integers from -127 to 127 represent (normalized) components
+in the range `-range`, `+range`.
+
 **VLINKS: introspection command that shows neighbors for a node**
 
     VLINKS key element [WITHSCORES]
