@@ -27,8 +27,7 @@ The execute the tests with:
 
 **VADD: add items into a vector set**
 
-    VADD key [REDUCE dim] FP32|VALUES vector element [CAS] [NOQUANT] [BIN] [Q8]
-             [EF build-exploration-factor]
+    VADD key [REDUCE dim] FP32|VALUES vector element [CAS] [NOQUANT | Q8 | BIN] [EF build-exploration-factor]
 
 Add a new element into the vector set specified by the key.
 The vector can be provided as FP32 blob of values, or as floating point
