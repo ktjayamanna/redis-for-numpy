@@ -189,6 +189,27 @@ Example:
     11) hnsw-max-node-uid
     12) (integer) 3000000
 
+**VSETATTR: associate or remove the JSON attributes of elements**
+
+    VSETATTR key element "{... json ...}"
+
+Each element of a vector set can be optionally associated with a JSON string
+in order to use the `FILTER` option of `VSIM` to filter elements by scalars
+(see the hybrid search section for more information). This command can set,
+update (if already set) or delete (if you set to an empty string) the
+associated JSON attributes of an element.
+
+The command returns 0 if the element or the key don't exist, without
+raising an error, otherwise 1 is returned, and the element attributes
+are set or updated.
+
+**VGETATTR: retrieve the JSON attributes of elements**
+
+    VGET key element
+
+The command returns the JSON attribute associated with an element, or
+null if there is no element associated, or no element at all, or no key.
+
 ## Hybrid search capabilities
 
 Each element of the vector set can be associated with a set of attributes specified as a JSON blob:
@@ -219,11 +240,11 @@ The expressions are similar to what you would write inside the `if` statement of
 
 Elements with invalid JSON or not having a given specified field **are considered as not matching** the expression, but will not generate any error at runtime.
 
-## FILTER effort
+## FILTER expressions capabilities
 
 Fill me.
 
-## FILTER expressions capabilities
+## FILTER effort
 
 Fill me.
 
