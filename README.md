@@ -210,7 +210,7 @@ are set or updated.
 The command returns the JSON attribute associated with an element, or
 null if there is no element associated, or no element at all, or no key.
 
-## Hybrid search capabilities
+# Hybrid search
 
 Each element of the vector set can be associated with a set of attributes specified as a JSON blob:
 
@@ -240,25 +240,111 @@ The expressions are similar to what you would write inside the `if` statement of
 
 Elements with invalid JSON or not having a given specified field **are considered as not matching** the expression, but will not generate any error at runtime.
 
+I'll draft the missing sections for the README following the style and format of the existing content.
+
 ## FILTER expressions capabilities
 
-Fill me.
+FILTER expressions allow you to perform complex filtering on vector similarity results using a JavaScript-like syntax. The expression is evaluated against each element's JSON attributes, with only elements that satisfy the expression being included in the results.
+
+### Expression Syntax
+
+Expressions support the following operators and capabilities:
+
+1. **Arithmetic operators**: `+`, `-`, `*`, `/`, `%` (modulo), `**` (exponentiation)
+2. **Comparison operators**: `>`, `>=`, `<`, `<=`, `==`, `!=`
+3. **Logical operators**: `and`/`&&`, `or`/`||`, `!`/`not`
+4. **Containment operator**: `in`
+5. **Parentheses** for grouping: `(...)`
+
+### Selector Notation
+
+Attributes are accessed using dot notation:
+
+- `.year` references the "year" attribute
+- `.movie.year` would **NOT** reference the "year" field inside a "movie" object, only keys that are at the first level of the JSON object are accessible.
+
+### Data Types
+
+Expressions can work with:
+
+- Numbers (integers and floats)
+- Strings (enclosed in single or double quotes)
+- Booleans (represented as 1 for true, 0 for false)
+- Arrays (for use with the `in` operator: `value in [1, 2, 3]`)
+
+### Examples
+
+```
+# Find items from the 1980s
+VSIM movies VALUES 3 0.5 0.8 0.2 FILTER '.year >= 1980 and .year < 1990'
+
+# Find action movies with high ratings
+VSIM movies VALUES 3 0.5 0.8 0.2 FILTER '.genre == "action" and .rating > 8.0'
+
+# Find movies directed by either Spielberg or Nolan
+VSIM movies VALUES 3 0.5 0.8 0.2 FILTER '.director in ["Spielberg", "Nolan"]'
+
+# Complex condition with numerical operations
+VSIM movies VALUES 3 0.5 0.8 0.2 FILTER '(.year - 2000) ** 2 < 100 and .rating / 2 > 4'
+```
+
+### Error Handling
+
+Elements with any of the following conditions are considered not matching:
+- Missing the queried JSON attribute
+- Having invalid JSON in their attributes
+- Having a JSON value that cannot be converted to the expected type
+
+This behavior allows you to safely filter on optional attributes without generating errors.
 
 ## FILTER effort
 
-Fill me.
+The `FILTER-EF` option controls the maximum effort spent when filtering vector search results.
 
-## Known bugs
+When performing vector similarity search with filtering, Vector Sets perform the standard similarity search as they apply the filter expression to each node. Since many results might be filtered out, Vector Sets may need to examine a lot more candidates than the requested `COUNT` to ensure sufficient matching results are returned. Actually, if the elements matching the filter are very rare or if there are less than elements matching than the specified count, this would trigger a full scan of the HNSW graph.
+
+For this reason, by default, the maximum effort is limited to a reasonable amount of nodes explored.
+
+### Modifying the FILTER effort
+
+1. By default, Vector Sets will explore up to `COUNT * 100` candidates to find matching results.
+2. You can control this exploration with the `FILTER-EF` parameter.
+3. A higher `FILTER-EF` value increases the chances of finding all relevant matches at the cost of increased processing time.
+4. A `FILTER-EF` of zero will explore as many nodes as needed in order to actually return the number of elements specified by `COUNT`.
+5. Even when a high `FILTER-EF` value is specified **the implementation will do a lot less work** if the elements passing the filter are very common, because of the early stop conditions of the HNSW implementation (once the specified amount of elements is reached and the quality check of the other candidates trigger an early stop).
+
+```
+VSIM key [ELE|FP32|VALUES] <vector or element> COUNT 10 FILTER '.year > 2000' FILTER-EF 500
+```
+
+In this example, Vector Sets will examine up to 500 potential nodes. Of course if count is reached before exploring 500 nodes, and the quality checks show that it is not possible to make progresses on similarity, the search is ended sooner.
+
+### Performance Considerations
+
+- If you have highly selective filters (few items match), use a higher `FILTER-EF`, or just design your application in order to handle a result set that is smaller than the requested count. Note that anyway the additional elements may be too distant than the query vector.
+- For less selective filters, the default should be sufficient.
+- Very selective filters with low `FILTER-EF` values may return fewer items than requested.
+- Extremely high values may impact performance without significantly improving results.
+
+The optimal `FILTER-EF` value depends on:
+1. The selectivity of your filter.
+2. The distribution of your data.
+3. The required recall quality.
+
+A good practice is to start with the default and increase if needed when you observe fewer results than expected.
+
+# Known bugs
 
 * When VADD with REDUCE is replicated, we should probably send the replicas the random matrix, in order for VEMB to read the same things. This is not critical, because the behavior of VADD / VSIM should be transparent if you don't look at the transformed vectors, but still probably worth doing.
 * Replication code is pretty much untested, and very vanilla (replicating the commands verbatim).
 
-## Implementation details
+# Implementation details
 
 Vector sets are based on the `hnsw.c` implementation of the HNSW data structure with extensions for speed and functionality.
 
 The main features are:
 
 * Proper nodes deletion with relinking.
-* 8 bits quantization.
+* 8 bits and binary quantization.
 * Threaded queries.
+* Hybrid search with predicate callback.
