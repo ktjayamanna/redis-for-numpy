@@ -205,7 +205,7 @@ are set or updated.
 
 **VGETATTR: retrieve the JSON attributes of elements**
 
-    VGET key element
+    VGETATTR key element
 
 The command returns the JSON attribute associated with an element, or
 null if there is no element associated, or no element at all, or no key.
