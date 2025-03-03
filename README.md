@@ -5,7 +5,7 @@ and later get a subset of the added items that are the most similar to a
 specified vector (often a learned embedding), or the most similar to the vector
 of an element that is already part of the Vector Set.
 
-Moreover, Vector sets implement optional hybrid search capabilities: it is possible to associate attributes to all or to a subset of elements in the set, and then, using the `FILTER` option of the `VSIM` command, to ask for items similar to a given vector but also passing a filter specified as a simple mathematical expression (Like `".year > 1950"` or similar).
+Moreover, Vector sets implement optional filtered search capabilities: it is possible to associate attributes to all or to a subset of elements in the set, and then, using the `FILTER` option of the `VSIM` command, to ask for items similar to a given vector but also passing a filter specified as a simple mathematical expression (Like `".year > 1950"` or similar). This means that **you can have vector similarity and scalar filters at the same time**.
 
 ## Installation
 
@@ -56,7 +56,7 @@ performed in the background, while the command is executed in the main thread.
 
 `EF` plays a role in the effort made to find good candidates when connecting the new node to the existing HNSW graph. The default is 200. Using a larger value, may help to have a better recall. To improve the recall it is also possible to increase `EF` during `VSIM` searches.
 
-`SETATTR` associates attributes to the newly created entry or update the entry attributes (if it already exists). It is the same as calling the `VSETATTR` attribute separately, so please check the documentation of that command in the hybrid search section of this documentation.
+`SETATTR` associates attributes to the newly created entry or update the entry attributes (if it already exists). It is the same as calling the `VSETATTR` attribute separately, so please check the documentation of that command in the filtered search section of this documentation.
 
 **VSIM: return elements by vector similarity**
 
@@ -88,7 +88,7 @@ It is possible to specify a `COUNT` and also to get the similarity score (from 1
 
 The `EF` argument is the exploration factor: the higher it is, the slower the command becomes, but the better the index is explored to find nodes that are near to our query. Sensible values are from 50 to 1000.
 
-For `FILTER` and `FILTER-EF` options, please check the hybrid search section of this documentation.
+For `FILTER` and `FILTER-EF` options, please check the filtered search section of this documentation.
 
 **VDIM: return the dimension of the vectors inside the vector set**
 
@@ -195,7 +195,7 @@ Example:
 
 Each element of a vector set can be optionally associated with a JSON string
 in order to use the `FILTER` option of `VSIM` to filter elements by scalars
-(see the hybrid search section for more information). This command can set,
+(see the filtered search section for more information). This command can set,
 update (if already set) or delete (if you set to an empty string) the
 associated JSON attributes of an element.
 
@@ -210,7 +210,7 @@ are set or updated.
 The command returns the JSON attribute associated with an element, or
 null if there is no element associated, or no element at all, or no key.
 
-# Hybrid search
+# Filtered search
 
 Each element of the vector set can be associated with a set of attributes specified as a JSON blob:
 
@@ -385,7 +385,7 @@ This time even if we asked for 10 items, we only get 3, since the default filter
      9) "risultati_delle_partite_disputate"
     10) "Peppermint_Mocha_Twist_Gingersnap"
 
-This time we get all the ten items, even if the last one will be quite far from our query vector. We encourage to experiment with this test dataset in order to understand better the dynamics of the implementation and the natural tradeoffs of hybrid search.
+This time we get all the ten items, even if the last one will be quite far from our query vector. We encourage to experiment with this test dataset in order to understand better the dynamics of the implementation and the natural tradeoffs of filtered search.
 
 **Keep in mind** that by default, Redis Vector Sets will try to avoid a likely very useless huge scan of the HNSW graph, and will be more happy to return few or no elements at all, since this is almost always what the user actually wants in the context of retrieving *similar* items to the query.
 
@@ -403,4 +403,4 @@ The main features are:
 * Proper nodes deletion with relinking.
 * 8 bits and binary quantization.
 * Threaded queries.
-* Hybrid search with predicate callback.
+* Filtered search with predicate callback.
