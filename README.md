@@ -263,14 +263,23 @@ Attributes are accessed using dot notation:
 - `.year` references the "year" attribute
 - `.movie.year` would **NOT** reference the "year" field inside a "movie" object, only keys that are at the first level of the JSON object are accessible.
 
-### Data Types
+### JSON and expressions data types
 
 Expressions can work with:
 
-- Numbers (integers and floats)
+- Numbers (dobule precision floats)
 - Strings (enclosed in single or double quotes)
-- Booleans (represented as 1 for true, 0 for false)
+- Booleans (no native type: they are represented as 1 for true, 0 for false)
 - Arrays (for use with the `in` operator: `value in [1, 2, 3]`)
+
+JSON attributes are converted in this way:
+
+- Numbers will be converted to numbers.
+- Strings to strings.
+- Booleans to 0 or 1 number.
+- Arrays to tuples (for "in" operator), but only if composed of just numbers and strings.
+
+Any other type is ignored, and accessig it will make the expression evaluate to false.
 
 ### Examples
 
@@ -297,7 +306,7 @@ Elements with any of the following conditions are considered not matching:
 
 This behavior allows you to safely filter on optional attributes without generating errors.
 
-## FILTER effort
+### FILTER effort
 
 The `FILTER-EF` option controls the maximum effort spent when filtering vector search results.
 
@@ -332,6 +341,53 @@ The optimal `FILTER-EF` value depends on:
 3. The required recall quality.
 
 A good practice is to start with the default and increase if needed when you observe fewer results than expected.
+
+### Testing a larg-ish data set
+
+To really see how things work at scale, you can [download](https://antirez.com/word2vec_with_attribs.rdb) the following dataset:
+
+    wget https://antirez.com/word2vec_with_attribs.rdb
+
+It contains the 3 million words in Word2Vec having as attribute a JSON with just the length of the word. Because of the length distribution of words in large amounts of texts, where longer words become less and less common, this is ideal to check how filtering behaves with a filter verifying as true with less and less elements in a vector set.
+
+For instance:
+
+    > VSIM word_embeddings_bin ele "pasta" FILTER ".len == 6"
+     1) "pastas"
+     2) "rotini"
+     3) "gnocci"
+     4) "panino"
+     5) "salads"
+     6) "breads"
+     7) "salame"
+     8) "sauces"
+     9) "cheese"
+    10) "fritti"
+
+This will easily retrieve the desired amount of items (`COUNT` is 10 by default) since there are many items of length 6. However:
+
+    > VSIM word_embeddings_bin ele "pasta" FILTER ".len == 33"
+    1) "skinless_boneless_chicken_breasts"
+    2) "boneless_skinless_chicken_breasts"
+    3) "Boneless_skinless_chicken_breasts"
+
+This time even if we asked for 10 items, we only get 3, since the default filter effort will be `10*100 = 1000`. We can tune this giving the effort in an explicit way, with the risk of our query being slower, of course:
+
+    > VSIM word_embeddings_bin ele "pasta" FILTER ".len == 33" FILTER-EF 10000
+     1) "skinless_boneless_chicken_breasts"
+     2) "boneless_skinless_chicken_breasts"
+     3) "Boneless_skinless_chicken_breasts"
+     4) "mozzarella_feta_provolone_cheddar"
+     5) "Greatfood.com_R_www.greatfood.com"
+     6) "Pepperidge_Farm_Goldfish_crackers"
+     7) "Prosecuted_Mobsters_Rebuilt_Dying"
+     8) "Crispy_Snacker_Sandwiches_Popcorn"
+     9) "risultati_delle_partite_disputate"
+    10) "Peppermint_Mocha_Twist_Gingersnap"
+
+This time we get all the ten items, even if the last one will be quite far from our query vector. We encourage to experiment with this test dataset in order to understand better the dynamics of the implementation and the natural tradeoffs of hybrid search.
+
+**Keep in mind** that by default, Redis Vector Sets will try to avoid a likely very useless huge scan of the HNSW graph, and will be more happy to return few or no elements at all, since this is almost always what the user actually wants in the context of retrieving *similar* items to the query.
 
 # Known bugs
 
