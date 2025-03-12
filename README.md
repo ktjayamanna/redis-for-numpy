@@ -391,9 +391,36 @@ This time we get all the ten items, even if the last one will be quite far from 
 
 **Keep in mind** that by default, Redis Vector Sets will try to avoid a likely very useless huge scan of the HNSW graph, and will be more happy to return few or no elements at all, since this is almost always what the user actually wants in the context of retrieving *similar* items to the query.
 
+# Scaling vector sets
+
+The fundamental way vector sets can be scaled to very large data sets
+and to many Redis instances is that a given very large set of vectors
+can be partitioned into N different Redis keys, that can also live into
+different Redis instances.
+
+For instance, I could add my elements into `key0`, `key1`, `key2`, by hashing
+the item in some way, like doing `crc32(item)%3`, effectively splitting
+the dataset into three different parts. However once I want all the vectors
+of my dataset near to a given query vector, I could simply perform the
+`VSIM` command against all the three keys, merging the results by
+score (so the commands must be called using the `WITHSCORES` option) on
+the client side: once the union of the results are ordered by the
+similarity score, the query is equivalent to having a single key `key1+2+3`
+containing all the items.
+
+There are a few interesting facts to note about this pattern:
+
+1. It is possible to have a logical sorted set that is as big as the sum of all the Redis instances we are using.
+2. Deletion operations remain simple, we can hash the key and select the key where our item belongs.
+3. However, even if I use 10 different Redis instances, I'm not going to reach 10x the **read** operations per second, compared to using a single server: for each logical query, I need to query all the instances. Yet, smaller graphs are faster to navigate, so there is some win even from the point of view of CPU usage.
+4. Insertions, so **write** queries, will be scaled linearly: I can add N items against N instances at the same time, splitting the insertion load evenly. This is very important since vector sets, being based on HNSW data structures, are slower to add items than to query similar items, by a very big factor.
+5. While it cannot guarantee always the best results, with proper timeout management this system may be considered *highly available*, since if a subset of N instances are reachable, I'll be still be able to return similar items to my query vector.
+
+Notably, this pattern can be implemented in order to avoid paying the sum of the round trip time with all the servers. It is possible to send the queries at the same time to all the instances, so that latency will equal the slower reply out of of the N servers queries.
+
 # Known bugs
 
-* When VADD with REDUCE is replicated, we should probably send the replicas the random matrix, in order for VEMB to read the same things. This is not critical, because the behavior of VADD / VSIM should be transparent if you don't look at the transformed vectors, but still probably worth doing.
+* When `VADD` with `REDUCE` is replicated, we should probably send the replicas the random matrix, in order for `VEMB` to read the same things. This is not critical, because the behavior of `VADD` / `VSIM` should be transparent if you don't look at the transformed vectors, but still probably worth doing.
 * Replication code is pretty much untested, and very vanilla (replicating the commands verbatim).
 
 # Implementation details
