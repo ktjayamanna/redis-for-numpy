@@ -391,7 +391,51 @@ This time we get all the ten items, even if the last one will be quite far from 
 
 **Keep in mind** that by default, Redis Vector Sets will try to avoid a likely very useless huge scan of the HNSW graph, and will be more happy to return few or no elements at all, since this is almost always what the user actually wants in the context of retrieving *similar* items to the query.
 
-# Scaling vector sets
+# Single Instance Scalability and Latency
+
+Vector Sets implement a threading model that allows Redis to handle many concurrent requests: by default `VSIM` is always threaded, and `VADD` is not (but can be partially threaded using the `CAS` option). This section explains how the threading and locking mechanisms work, and what to expect in terms of performance.
+
+## Threading Model
+
+- The `VSIM` command runs in a separate thread by default, allowing Redis to continue serving other commands.
+- A maximum of 32 threads can run concurrently (defined by `HNSW_MAX_THREADS`).
+- When this limit is reached, additional `VSIM` requests are queued - Redis remains responsive, no latency event is generated.
+- The `VADD` command with the `CAS` option also leverages threading for the computation-heavy candidate search phase, but the insertion itself is performed in the main thread. `VADD` always runs in a sub-millisecond time, so this is not a source of latency, but having too many hundreds of writes per second can be challenging to handle with a single instance. Please, look at the next section about multiple instances scalability.
+- Commands run within Lua scripts, MULTI/EXEC blocks, or from replication are executed in the main thread to ensure consistency.
+
+```
+> VSIM vset VALUES 3 1 1 1 FILTER '.year > 2000'  # This runs in a thread.
+> VADD vset VALUES 3 1 1 1 element CAS            # Candidate search runs in a thread.
+```
+
+## Locking Mechanism
+
+Vector Sets use a read/write locking mechanism to coordinate access:
+
+- Reads (`VSIM`, `VEMB`, etc.) acquire a read lock, allowing multiple concurrent reads.
+- Writes (`VADD`, `VREM`, etc.) acquire a write lock, temporarily blocking all reads.
+- When a write lock is requested while reads are in progress, the write operation waits for all reads to complete.
+- Once a write lock is granted, all reads are blocked until the write completes.
+- Each thread has a dedicated slot for tracking visited nodes during graph traversal, avoiding contention. This improves performances but limits the maximum number of concurrent threads, since each node has a memory cost proportional to the number of slots.
+
+## DEL latency
+
+Deleting a very large vector set (millions of elements) can cause latency spikes, as deletion rebuilds connections between nodes. This may change in the future.
+The deletion latency is most noticeable when using `DEL` on a key containing a large vector set or when the key expires.
+
+## Performance Characteristics
+
+- Search operations (`VSIM`) scale almost linearly with the number of CPU cores available, up to the thread limit. You can expect a Vector Set composed of million of items associated with components of dimension 300, with the default int8 quantization, to deliver around 50k VSIM operations per second in a single host.
+- Insertion operations (`VADD`) are more computationally expensive than searches, and can't be threaded: expect much lower throughput, in the range of a few thousands inserts per second.
+- Binary quantization offers significantly faster search performance at the cost of some recall quality, while int8 quantization, the default, seems to have very small impacts on recall quality, while it significantly improves performances and space efficiency.
+- The `EF` parameter has a major impact on both search quality and performance - higher values mean better recall but slower searches.
+- Graph traversal time scales logarithmically with the number of elements, making Vector Sets efficient even with millions of vectors
+
+## Loading / Saving performances
+
+Vector Sets are able to serialize on disk the graph structure as it is in memory, so loading back the data does not need to rebuild the HNSW graph. This means that Redis can load millions of items per minute. For instance 3 million items with 300 components vectors can be loaded back into memory into around 15 seconds.
+
+# Scaling vector sets to multiple instances
 
 The fundamental way vector sets can be scaled to very large data sets
 and to many Redis instances is that a given very large set of vectors
