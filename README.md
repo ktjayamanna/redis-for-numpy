@@ -462,6 +462,20 @@ There are a few interesting facts to note about this pattern:
 
 Notably, this pattern can be implemented in order to avoid paying the sum of the round trip time with all the servers. It is possible to send the queries at the same time to all the instances, so that latency will equal the slower reply out of of the N servers queries.
 
+# Vector Sets troubleshooting and understandability
+
+Vector graphs and similarity queries pose many challenges mainly due to the following three problems:
+
+1. The error due to the approximated nature of Vector Sets is hard to evaluate.
+2. The error added by the quantization is often depends on the exact vector space (the embedding we are using **and** how far apart the elements we represent into such embeddings are).
+3. We live in the illusion that learned embeddings capture the best similarity possible among elements, which is obviously not always true, and highly application dependent.
+
+The only way to debug such problems, is the ability to inspect step by step what is happening inside our application, and the structure of the HNSW graph itself. To do so, we suggest to consider the following tools:
+
+1. The `TRUTH` option of the `VSIM` command is able to return the ground truth of the most similar elements, without using the HNSW graph, but doing a linear scan.
+2. The `VLINKS` command allows to explore the graph to see if the connections among nodes make sense, and to investigate why a given node may be more isolated than expected. Such command can also be used in a different way, when we want very fast "similar items" without paying the HNSW traversal time. It exploits the fact that we have a direct reference from each element in our vector set to each node in our HNSW graph.
+3. The `WITHSCORES` option, in the supported commands, return a value that is directly related to the *cosine similarity* between the query and the items vectors, the interval of the similarity is simply rescaled from the -1, 1 original range to 0, 1, otherwise the metric is identical.
+
 # Known bugs
 
 * When `VADD` with `REDUCE` is replicated, we should probably send the replicas the random matrix, in order for `VEMB` to read the same things. This is not critical, because the behavior of `VADD` / `VSIM` should be transparent if you don't look at the transformed vectors, but still probably worth doing.
