@@ -30,7 +30,7 @@ The execute the tests with:
 **VADD: add items into a vector set**
 
     VADD key [REDUCE dim] FP32|VALUES vector element [CAS] [NOQUANT | Q8 | BIN]
-             [EF build-exploration-factor] [SETATTR <attributes>]
+             [EF build-exploration-factor] [SETATTR <attributes>] [M <numlinks>]
 
 Add a new element into the vector set specified by the key.
 The vector can be provided as FP32 blob of values, or as floating point
@@ -57,6 +57,8 @@ performed in the background, while the command is executed in the main thread.
 `EF` plays a role in the effort made to find good candidates when connecting the new node to the existing HNSW graph. The default is 200. Using a larger value, may help to have a better recall. To improve the recall it is also possible to increase `EF` during `VSIM` searches.
 
 `SETATTR` associates attributes to the newly created entry or update the entry attributes (if it already exists). It is the same as calling the `VSETATTR` attribute separately, so please check the documentation of that command in the filtered search section of this documentation.
+
+`M` defaults to 16 and is the HNSW famous `M` parameters. It is the maximum number of connections that each node of the graph have with other nodes: more connections mean more memory, but a better ability to explore the graph. Nodes at layer zero (every node exists at least at layer zero) have `M*2` connections, while the other layers only have `M` connections. This means that, for instance, an `M` of 64 will use at least 1024 bytes of memory for each node! That is, `64 links * 2 times * 8 bytes pointers`, and even more, since on average each node has something like 1.33 layers (but the other layers have just `M` connections, instead of `M*2`). If you don't have a recall quality problem, the default is fine, and uses a limited amount of memory.
 
 **VSIM: return elements by vector similarity**
 
