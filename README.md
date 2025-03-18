@@ -214,6 +214,68 @@ are set or updated.
 The command returns the JSON attribute associated with an element, or
 null if there is no element associated, or no element at all, or no key.
 
+**VRANDMEMBER: return random members from a vector set**
+
+    VRANDMEMBER key [count]
+
+Return one or more random elements from a vector set.
+
+The semantics of this command are similar to Redis's native SRANDMEMBER command:
+
+- When called without count, returns a single random element from the set, as a single string (no array reply).
+- When called with a positive count, returns up to count distinct random elements (no duplicates).
+- When called with a negative count, returns count random elements, potentially with duplicates.
+- If the count value is larger than the set size (and positive), only the entire set is returned.
+
+If the key doesn't exist, returns a Null reply if count is not given, or an empty array if a count is provided.
+
+Examples:
+
+    > VADD vset VALUES 3 1 0 0 elem1
+    (integer) 1
+    > VADD vset VALUES 3 0 1 0 elem2
+    (integer) 1
+    > VADD vset VALUES 3 0 0 1 elem3
+    (integer) 1
+
+    # Return a single random element
+    > VRANDMEMBER vset
+    "elem2"
+
+    # Return 2 distinct random elements
+    > VRANDMEMBER vset 2
+    1) "elem1"
+    2) "elem3"
+
+    # Return 3 random elements with possible duplicates
+    > VRANDMEMBER vset -3
+    1) "elem2"
+    2) "elem2"
+    3) "elem1"
+
+    # Return more elements than in the set (returns all elements)
+    > VRANDMEMBER vset 10
+    1) "elem1"
+    2) "elem2"
+    3) "elem3"
+
+    # When key doesn't exist
+    > VRANDMEMBER nonexistent
+    (nil)
+    > VRANDMEMBER nonexistent 3
+    (empty array)
+
+This command is particularly useful for:
+
+1. Selecting random samples from a vector set for testing or training.
+2. Performance testing by retrieving random elements for subsequent similarity searches.
+
+When the user asks for unique elements (positev count) the implementation optimizes for two scenarios:
+- For small sample sizes (less than 20% of the set size), it uses a dictionary to avoid duplicates, and performs a real random walk inside the graph.
+- For large sample sizes (more than 20% of the set size), it starts from a random node and sequentially traverses the internal list, providing faster performances but not really "random" elements.
+
+The command has `O(N)` worst-case time complexity when requesting many unique elements (it uses linear scanning), or `O(M*log(N))` complexity when the users asks for `M` random elements in a sorted set of `N` elements, with `M` much smaller than `N`.
+
 # Filtered search
 
 Each element of the vector set can be associated with a set of attributes specified as a JSON blob:
@@ -225,7 +287,7 @@ Each element of the vector set can be associated with a set of attributes specif
 
 Specifying an attribute with the `SETATTR` option of `VADD` is exactly equivalent to adding an element and then setting (or updating, if already set) the attributes JSON string. Also the symmetrical `VGETATTR` command returns the attribute associated to a given element.
 
-    > VAD vset VALUES 3 0 1 0 c
+    > VADD vset VALUES 3 0 1 0 c
     (integer) 1
     > VSETATTR vset c '{"year": 1952}'
     (integer) 1
@@ -243,8 +305,6 @@ The items will be returned again in order of similarity (most similar first), bu
 The expressions are similar to what you would write inside the `if` statement of JavaScript or other familiar programming languages: you can use `and`, `or`, the obvious math operators like `+`, `-`, `/`, `>=`, `<`, ... and so forth (see the expressions section for more info). The selectors of the JSON object attributes start with a dot followed by the name of the key inside the JSON objects.
 
 Elements with invalid JSON or not having a given specified field **are considered as not matching** the expression, but will not generate any error at runtime.
-
-I'll draft the missing sections for the README following the style and format of the existing content.
 
 ## FILTER expressions capabilities
 
