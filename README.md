@@ -42,7 +42,7 @@ Meaning of the options:
 
 `REDUCE` implements random projection, in order to reduce the
 dimensionality of the vector. The projection matrix is saved and reloaded
-along with the vector set.
+along with the vector set. **Please note that** the `REDUCE` option must be passed immediately before the vector, like in `REDUCE 50 VALUES ...`.
 
 `CAS` performs the operation partially using threads, in a
 check-and-set style. The neighbor candidates collection, which is slow, is
