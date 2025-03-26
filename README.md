@@ -562,7 +562,6 @@ Switching from `VALUES` to `FP32` as a method for transmitting vectors may easil
 
 # Known bugs
 
-* When `VADD` with `REDUCE` is replicated, we should probably send the replicas the random matrix, in order for `VEMB` to read the same things. This is not critical, because the behavior of `VADD` / `VSIM` should be transparent if you don't look at the transformed vectors, but still probably worth doing.
 * Replication code is pretty much untested, and very vanilla (replicating the commands verbatim).
 
 # Implementation details
