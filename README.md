@@ -537,6 +537,8 @@ Vector Sets, or better, HNSWs, the underlying data structure used by Vector Sets
 
 # Vector Sets troubleshooting and understandability
 
+## Debugging poor recall or unexpected results
+
 Vector graphs and similarity queries pose many challenges mainly due to the following three problems:
 
 1. The error due to the approximated nature of Vector Sets is hard to evaluate.
@@ -548,6 +550,15 @@ The only way to debug such problems, is the ability to inspect step by step what
 1. The `TRUTH` option of the `VSIM` command is able to return the ground truth of the most similar elements, without using the HNSW graph, but doing a linear scan.
 2. The `VLINKS` command allows to explore the graph to see if the connections among nodes make sense, and to investigate why a given node may be more isolated than expected. Such command can also be used in a different way, when we want very fast "similar items" without paying the HNSW traversal time. It exploits the fact that we have a direct reference from each element in our vector set to each node in our HNSW graph.
 3. The `WITHSCORES` option, in the supported commands, return a value that is directly related to the *cosine similarity* between the query and the items vectors, the interval of the similarity is simply rescaled from the -1, 1 original range to 0, 1, otherwise the metric is identical.
+
+## Clients, latency and bandwidth usage
+
+During Vector Sets testing, we discovered that often clients introduce considerable latecy and CPU usage (in the client side, not in Redis) for two main reasons:
+
+1. Often the serialization to `VALUES ... list of floats ...` can be very slow.
+2. The vector payload of floats represented as strings is very large, resulting in high bandwidth usage and latency, compared to other Redis commands.
+
+Switching from `VALUES` to `FP32` as a method for transmitting vectors may easily provide 10-20x speedups.
 
 # Known bugs
 
