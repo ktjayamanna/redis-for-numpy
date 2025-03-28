@@ -537,6 +537,61 @@ Vector Sets, or better, HNSWs, the underlying data structure used by Vector Sets
 * It is possible to gain space (less memory usage) sacrificing time (more CPU time) by using a low `M` (the default of 16, for instance) and a high `EF` (the effort parameter of `VSIM`) in order to scan the graph more deeply.
 * When memory usage is seriosu concern, and there is the suspect the vectors we are storing don't contain as much information - at least for our use case - to justify the number of components they feature, random projection (the `REDUCE` option of `VADD`) could be tested to see if dimensionality reduction is possible with acceptable precision loss.
 
+## Random projection tradeoffs
+
+Sometimes learned vectors are not as information dense as we could guess, that
+is there are components having similar meanings in the space, and components
+having values that don't really represent features that matter in our use case.
+
+At the same time, certain vectors are very big, 1024 components or more. In this cases, it is possible to use the random projection feature of Redis Vector Sets in order to reduce both space (less RAM used) and space (more operstions per second). The feature is accessible via the `REDUCE` option of the `VADD` command. However, keep in mind that you need to test how much reduction impacts the performances of your vectors in term of recall and quality of the results you get back.
+
+## What is a random projection?
+
+The concept of Random Projection is relatively simple to grasp. For instance, a projection that turns a 100 components vector into a 10 components vector will perform a different linear transformation between the 100 components and each of the target 10 components. Please note that *each of the target components* will get some random amount of all the 100 original components. It is mathematically proved that this process results in a vector space where elements still have similar distances among them, but still some information will get lost.
+
+## Examples of projections and loss of precision
+
+To show you a bit of a extreme case, let's take Word2Vec 3 million items and compress them from 300 to 100, 50 and 25 components vectors. Then, we check the recall compared to the ground truth against each of the vector sets produced in this way (using different `REDUCE` parameters of `VADD`). This is the result, obtained asking for the top 10 elements.
+
+```
+----------------------------------------------------------------------
+Key                            Average Recall % Std Dev
+----------------------------------------------------------------------
+word_embeddings_int8           95.98           12.14
+  ^ This is the same key used for ground truth, but without TRUTH option
+word_embeddings_reduced_100    40.20           20.13
+word_embeddings_reduced_50     24.42           16.89
+word_embeddings_reduced_25     14.31           9.99
+```
+
+Here the dimensionality reduction we are using is quite extreme: from 300 to 100 means that 66.6% of the original information is lost. The recall drops from 96% to 40%, down to 24% and 14% for even more extreme dimension reduction.
+
+Reducing the dimension of vectors that are already relatively small, like the above example, of 300 components, will provide only relatively small memory savings, especially because by default Vector Sets use `int8` quantization, that will use only one byte per component:
+
+```
+> MEMORY USAGE word_embeddings_int8
+(integer) 3107002888
+> MEMORY USAGE word_embeddings_reduced_100
+(integer) 2507122888
+```
+
+Of course going, for example, from 2048 component vectors to 1024 would provide a much more sensible memory saving, even with the `int8` quantization used by Vector Sets, assuming the recall loss is acceptable. Other than the memory saving, there is also the reduction in CPU time, translating to more operations per second.
+
+Another thing to note is that, with certain embedding models, binary quantization (that offers a 8x reduction of memory usage compared to 8 bit quants, and a very big speedup in computation) performs much better than reducing the dimension of vectors of the same amount via random projections:
+
+```
+word_embeddings_bin            35.48           19.78
+```
+
+Here in the same test did above: we have a 35% recall which is not too far than the 40% obtained with a random projection from 300 to 100 components. However, while the first technique reduces the size by 3 times, the size reduced of binary quantization is by 8 times.
+
+```
+> memory usage word_embeddings_bin
+(integer) 2327002888
+```
+
+In this specific case the key uses JSON attributes and has a graph connection overhead that is much bigger than the 300 bits each vector takes, but, as already said, for big vectors (1024 components, for instance) or for lower values of `M` (see `VADD`, the `M` parameter connects the level of connectivity, so it changes the amount of pointers used per node) the memory saving is much stronger.
+
 # Vector Sets troubleshooting and understandability
 
 ## Debugging poor recall or unexpected results
