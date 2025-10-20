@@ -32,6 +32,7 @@ deps/hdr_histogram/libhdrhistogram.a
 deps/fpconv/libfpconv.a
 deps/fast_float/libfast_float.a
 tests/tls/*
+tests/kaveen_tests
 .make-*
 .prerequisites
 *.dSYM
