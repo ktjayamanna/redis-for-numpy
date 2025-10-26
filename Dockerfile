@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:focal/python-3.10
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y \
     tree \
     git \
     tcl \
+    python3-pip \
+    && pip3 install numpy \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -26,3 +28,4 @@ EXPOSE 8080
 
 # Keep container running for development
 CMD ["sleep", "infinity"]
+
